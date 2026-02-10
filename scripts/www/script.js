@@ -7,6 +7,7 @@ let currentDeleteTaskId = null;
 let currentKeyValuePairs = [];
 
 // DOM元素
+const notificationContainer = document.getElementById('notification-container');
 const addTaskBtn = document.getElementById('add-task');
 const runAllBtn = document.getElementById('run-all');
 const clearListBtn = document.getElementById('clear-list');
@@ -50,6 +51,50 @@ const importFromFileBtn = document.getElementById('import-from-file');
 const importClipboardBtn = document.getElementById('import-clipboard');
 const clipboardImportCancelBtn = document.getElementById('clipboard-import-cancel');
 const clipboardImportCloseBtn = clipboardImportModal.querySelector('.close');
+
+// 节点内容对话框元素
+const nodeModal = document.getElementById('node-modal');
+const nodeContent = document.getElementById('node-content');
+const copyNodeContentBtn = document.getElementById('copy-node-content');
+const downloadNodeContentBtn = document.getElementById('download-node-content');
+const nodeModalCancelBtn = document.getElementById('node-modal-cancel');
+const nodeModalCloseBtn = nodeModal.querySelector('.close');
+const nodeButton = document.getElementById('node-button');
+
+// 通知系统
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+    
+    const closeSpan = document.createElement('span');
+    closeSpan.className = 'notification-close';
+    closeSpan.textContent = '×';
+    
+    notification.appendChild(messageSpan);
+    notification.appendChild(closeSpan);
+    
+    notificationContainer.insertBefore(notification, notificationContainer.firstChild);
+    
+    let timeoutId;
+    const removeNotification = () => {
+        notification.classList.add('removing');
+        notification.addEventListener('animationend', () => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        });
+    };
+    
+    notification.addEventListener('click', () => {
+        clearTimeout(timeoutId);
+        removeNotification();
+    });
+    
+    timeoutId = setTimeout(removeNotification, 3000);
+}
 
 // 初始化
 function init() {
@@ -111,6 +156,13 @@ function setupEventListeners() {
     clipboardImportCancelBtn.addEventListener('click', closeClipboardImportModal);
     clipboardImportCloseBtn.addEventListener('click', closeClipboardImportModal);
     
+    // 节点内容对话框事件
+    nodeButton.addEventListener('click', showNodeModal);
+    copyNodeContentBtn.addEventListener('click', copyNodeContentToClipboard);
+    downloadNodeContentBtn.addEventListener('click', downloadNodeContent);
+    nodeModalCancelBtn.addEventListener('click', closeNodeModal);
+    nodeModalCloseBtn.addEventListener('click', closeNodeModal);
+    
     // 点击弹窗外部不关闭弹窗，但触发按钮和窗口动画
     window.addEventListener('click', (e) => {
         if (e.target === settingsModal) {
@@ -162,6 +214,16 @@ function setupEventListeners() {
             // 触发窗口缩放动画
             animateWindow(clipboardImportModal);
         }
+        if (e.target === nodeModal) {
+            // 触发节点内容窗口按钮动画
+            const closeBtn = nodeModal.querySelector('.close');
+            const copyBtn = nodeModal.querySelector('#copy-node-content');
+            const downloadBtn = nodeModal.querySelector('#download-node-content');
+            const cancelBtn = nodeModal.querySelector('#node-modal-cancel');
+            animateButtons([closeBtn, copyBtn, downloadBtn, cancelBtn]);
+            // 触发窗口缩放动画
+            animateWindow(nodeModal);
+        }
     });
 
     // 按钮动画函数
@@ -209,16 +271,31 @@ function addTask() {
 // 渲染任务列表
 function renderTasks() {
     taskTableBody.innerHTML = '';
-    tasks.forEach(task => {
+    tasks.forEach((task, index) => {
         const row = document.createElement('tr');
         row.dataset.id = task.id;
+        row.dataset.index = index;
+        row.draggable = true;
+        row.classList.add('draggable');
+        
+        // 拖动手柄
+        const dragHandleCell = document.createElement('td');
+        dragHandleCell.style.width = '5%';
+        const dragHandle = document.createElement('span');
+        dragHandle.className = 'drag-handle';
+        dragHandle.innerHTML = '☰';
+        dragHandleCell.appendChild(dragHandle);
         
         // 任务名
         const nameCell = document.createElement('td');
+        nameCell.style.width = '30%';
+        nameCell.style.whiteSpace = 'normal';
+        nameCell.style.wordWrap = 'break-word';
         nameCell.textContent = task.name;
         
         // 状态
         const statusCell = document.createElement('td');
+        statusCell.style.width = '25%';
         const taskStatus = task.status || '就绪';
         statusCell.textContent = taskStatus;
         // 设置状态样式
@@ -234,6 +311,8 @@ function renderTasks() {
         
         // 操作按钮
         const actionCell = document.createElement('td');
+        actionCell.style.width = '40%';
+        actionCell.style.minWidth = '182px';
         const actionButtons = document.createElement('div');
         actionButtons.className = 'action-buttons';
         
@@ -257,11 +336,93 @@ function renderTasks() {
         actionButtons.appendChild(deleteBtn);
         actionCell.appendChild(actionButtons);
         
+        row.appendChild(dragHandleCell);
         row.appendChild(nameCell);
         row.appendChild(statusCell);
         row.appendChild(actionCell);
         taskTableBody.appendChild(row);
+        
+        // 添加拖动事件监听器
+        setupDragEvents(row);
     });
+}
+
+// 设置拖动事件
+function setupDragEvents(row) {
+    row.addEventListener('dragstart', handleDragStart);
+    row.addEventListener('dragend', handleDragEnd);
+    row.addEventListener('dragover', handleDragOver);
+    row.addEventListener('drop', handleDrop);
+    row.addEventListener('dragenter', handleDragEnter);
+    row.addEventListener('dragleave', handleDragLeave);
+}
+
+let draggedRow = null;
+
+function handleDragStart(e) {
+    draggedRow = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+    const rows = taskTableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        row.classList.remove('drag-over');
+    });
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter(e) {
+    if (this !== draggedRow) {
+        this.classList.add('drag-over');
+    }
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    if (draggedRow !== this) {
+        const draggedIndex = parseInt(draggedRow.dataset.index);
+        const targetIndex = parseInt(this.dataset.index);
+        
+        // 重新排序tasks数组
+        const draggedTask = tasks[draggedIndex];
+        tasks.splice(draggedIndex, 1);
+        tasks.splice(targetIndex, 0, draggedTask);
+        
+        // 重新分配ID为连续数字
+        reassignTaskIds();
+        
+        // 保存并重新渲染
+        saveTasksToLocalStorage();
+        renderTasks();
+    }
+    
+    return false;
+}
+
+// 重新分配任务ID为连续数字
+function reassignTaskIds() {
+    tasks.forEach((task, index) => {
+        task.id = index + 1;
+    });
+    currentTaskId = tasks.length + 1;
 }
 
 // 显示设置弹窗
@@ -361,13 +522,13 @@ function saveTaskSettings(e) {
         
         // 检查命令是否为空
         if (!key) {
-            alert(`第${i + 1}行的命令不能为空`);
+            showNotification(`第${i + 1}行的命令不能为空`, 'error');
             return;
         }
         
         // 检查命令是否重复
         if (keySet.has(key)) {
-            alert(`命令"${key}"重复，请修改`);
+            showNotification(`命令"${key}"重复，请修改`, 'warning');
             return;
         }
         
@@ -582,14 +743,41 @@ function closeConfigModal() {
 // 复制配置到剪贴板
 function copyConfigToClipboard() {
     const configText = configTextarea.value;
-    navigator.clipboard.writeText(configText)
-        .then(() => {
-            alert('配置已复制到剪贴板');
-        })
-        .catch(err => {
-            alert('复制失败，请手动复制');
-            console.error('复制失败:', err);
-        });
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(configText)
+            .then(() => {
+                showNotification('配置已复制到剪贴板', 'info');
+            })
+            .catch(err => {
+                fallbackCopy(configText);
+            });
+    } else {
+        fallbackCopy(configText);
+    }
+}
+
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showNotification('配置已复制到剪贴板', 'info');
+        } else {
+            showNotification('复制失败，请手动复制', 'error');
+        }
+    } catch (err) {
+        showNotification('复制失败，请手动复制', 'error');
+        console.error('复制失败:', err);
+    }
+    
+    document.body.removeChild(textarea);
 }
 
 // 保存配置到文件
@@ -619,6 +807,9 @@ function importFromFile() {
         const file = e.target.files[0];
         if (!file) return;
         
+        // 关闭剪贴板导入窗口
+        closeClipboardImportModal();
+        
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
@@ -635,7 +826,7 @@ function importFromFile() {
                     }
                 }
             } catch (error) {
-                alert('导入失败：无效的JSON文件');
+                showNotification('导入失败：无效的JSON文件', 'error');
             }
         };
         reader.readAsText(file);
@@ -662,7 +853,7 @@ function pasteFromClipboard() {
             clipboardImportTextarea.value = text;
         })
         .catch(err => {
-            alert('粘贴失败，请手动粘贴');
+            showNotification('粘贴失败，请手动粘贴', 'error');
             console.error('粘贴失败:', err);
         });
 }
@@ -671,7 +862,7 @@ function pasteFromClipboard() {
 function importFromClipboard() {
     const clipboardText = clipboardImportTextarea.value.trim();
     if (!clipboardText) {
-        alert('请粘贴配置文件内容');
+        showNotification('请粘贴配置文件内容', 'warning');
         return;
     }
     
@@ -690,10 +881,10 @@ function importFromClipboard() {
                 closeClipboardImportModal();
             }
         } else {
-            alert('导入失败：无效的配置格式');
+            showNotification('导入失败：无效的配置格式', 'error');
         }
     } catch (error) {
-        alert('导入失败：无效的JSON格式');
+        showNotification('导入失败：无效的JSON格式', 'error');
         console.error('导入失败:', error);
     }
 }
@@ -749,6 +940,94 @@ function importTasks(importedTasks, type) {
     
     saveTasksToLocalStorage();
     renderTasks();
+}
+
+// 显示节点内容弹窗
+function showNodeModal() {
+    const content = `// 1. 获取输入并做空值保护
+const inputStr = msg.payload || "";
+let outputStr = "";
+
+// 2. 锁定唯一关键字定位目标内容起始位置
+const targetKeyword = "PROCEDURE,RUN,";
+const keywordIndex = inputStr.indexOf(targetKeyword);
+
+if (keywordIndex !== -1) {
+    // 3. 从关键字开始截取
+    let tempStr = inputStr.substring(keywordIndex);
+    
+    // 4. 大括号计数法精准定位目标结尾（避免多余内容）
+    let braceCount = 0;
+    let endIndex = -1;
+    
+    for (let i = 0; i < tempStr.length; i++) {
+        const char = tempStr[i];
+        if (char === "{") {
+            braceCount++;
+        } else if (char === "}") {
+            braceCount--;
+            if (braceCount === 0) {
+                endIndex = i;
+                break;
+            }
+        }
+    }
+    
+    // 5. 截取完整目标内容
+    if (endIndex !== -1) {
+        outputStr = tempStr.substring(0, endIndex + 1);
+        
+        // 6. 终极清理转义符：支持多层转义，彻底去除所有 \" 格式
+        // 循环替换，直到没有转义符残留为止（解决顽固转义符问题）
+        while (outputStr.includes('\\"')) {
+            outputStr = outputStr.replace(/\\"/g, '"');
+        }
+        // 清理可能残留的单独反斜杠
+        outputStr = outputStr.replace(/\\(?!["'])/g, '');
+    }
+}
+
+// 7. 赋值并返回msg
+msg.payload = [outputStr];
+return msg;`;
+    nodeContent.value = content;
+    nodeModal.style.display = 'block';
+}
+
+// 关闭节点内容弹窗
+function closeNodeModal() {
+    nodeModal.style.display = 'none';
+}
+
+// 复制节点内容到剪贴板
+function copyNodeContentToClipboard() {
+    const content = nodeContent.value;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(content)
+            .then(() => {
+                showNotification('复制成功', 'info');
+            })
+            .catch(err => {
+                fallbackCopy(content);
+            });
+    } else {
+        fallbackCopy(content);
+    }
+}
+
+// 下载节点内容为文件
+function downloadNodeContent() {
+    const content = nodeContent.value;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nodered-sageblock-function.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 // 初始化应用

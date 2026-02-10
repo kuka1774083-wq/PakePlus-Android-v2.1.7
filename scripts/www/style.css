@@ -130,6 +130,36 @@ body {
     background-color: #f5f5f5;
 }
 
+.task-list tr.draggable {
+    cursor: move;
+}
+
+.task-list tr.dragging {
+    opacity: 0.5;
+    background-color: #e3f2fd;
+}
+
+.task-list tr.drag-over {
+    border-top: 2px solid #2196F3;
+    border-bottom: 2px solid #2196F3;
+}
+
+.drag-handle {
+    cursor: move;
+    color: #999;
+    font-size: 18px;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.drag-handle:hover {
+    color: #2196F3;
+}
+
 /* 操作按钮组 */
 .action-buttons {
     display: flex;
@@ -143,6 +173,8 @@ body {
     cursor: pointer;
     font-size: 12px;
     transition: background-color 0.3s;
+    min-width: 60px;
+    text-align: center;
 }
 
 .action-buttons button:nth-child(1) {
@@ -274,21 +306,24 @@ body {
 
 .modal-footer button[type="submit"],
 .modal-footer button#save-config,
-.modal-footer button#import-clipboard {
+.modal-footer button#import-clipboard,
+.modal-footer button#download-node-content {
     background-color: #4CAF50;
     color: white;
 }
 
 .modal-footer button[type="submit"]:hover,
 .modal-footer button#save-config:hover,
-.modal-footer button#import-clipboard:hover {
+.modal-footer button#import-clipboard:hover,
+.modal-footer button#download-node-content:hover {
     background-color: #45a049;
 }
 
 .modal-footer button.cancel,
 .modal-footer button#config-cancel,
 .modal-footer button#clipboard-import-cancel,
-.modal-footer button#confirm-no {
+.modal-footer button#confirm-no,
+.modal-footer button#node-modal-cancel {
     background-color: #f44336;
     color: white;
 }
@@ -296,21 +331,33 @@ body {
 .modal-footer button.cancel:hover,
 .modal-footer button#config-cancel:hover,
 .modal-footer button#clipboard-import-cancel:hover,
-.modal-footer button#confirm-no:hover {
+.modal-footer button#confirm-no:hover,
+.modal-footer button#node-modal-cancel:hover {
     background-color: #da190b;
 }
 
 .modal-footer button#copy-config,
 .modal-footer button#paste-clipboard,
-.modal-footer button#import-from-file {
+.modal-footer button#import-from-file,
+.modal-footer button#copy-node-content {
     background-color: #2196F3;
     color: white;
 }
 
 .modal-footer button#copy-config:hover,
 .modal-footer button#paste-clipboard:hover,
-.modal-footer button#import-from-file:hover {
+.modal-footer button#import-from-file:hover,
+.modal-footer button#copy-node-content:hover {
     background-color: #0b7dda;
+}
+
+.modal-footer button#node-button {
+    background-color: #f34421;
+    color: white;
+}
+
+.modal-footer button#node-button:hover {
+    background-color: #d83c1d;
 }
 
 .modal-footer button#confirm-yes {
@@ -559,17 +606,9 @@ textarea:focus {
 }
 
 /* 响应式设计 */
-@media (max-width: 768px) {
-    .container {
-        padding: 10px;
-    }
-    
+@media (max-width: 748px) {
     .button-bar {
         flex-direction: column;
-    }
-    
-    .button-bar button {
-        width: 100%;
     }
     
     .task-list table {
@@ -586,11 +625,90 @@ textarea:focus {
     }
     
     .action-buttons button {
-        width: 100%;
+        width: auto;
+        align-self: flex-start;
     }
     
     .modal-content {
         width: 95%;
         margin: 20% auto;
+    }
+}
+
+/* 通知系统样式 */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 350px;
+}
+
+.notification {
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 280px;
+    transition: all 0.3s ease;
+    animation: slideIn 0.3s ease-out;
+}
+
+.notification.removing {
+    animation: slideOut 0.3s ease-in forwards;
+}
+
+.notification.info {
+    background-color: #2196F3;
+    color: white;
+}
+
+.notification.warning {
+    background-color: #ff9800;
+    color: white;
+}
+
+.notification.error {
+    background-color: #f44336;
+    color: white;
+}
+
+.notification-close {
+    margin-left: 15px;
+    font-size: 18px;
+    font-weight: bold;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+    opacity: 1;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
     }
 }
